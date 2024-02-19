@@ -1,0 +1,219 @@
+<html>
+ <head>
+   <title>Bangle.js Accelerometer streaming in 3D</title>
+ </head>
+ <body style="margin:0px">
+<script src="https://www.puck-js.com/puck.js"></script>
+<button id="btnConnect" style="position:absolute;left:5px;top:5px;z-index:1000">Connect</button>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r99/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.5.0/p5.min.js"></script>
+<script>
+new p5();
+var btnp = 0;
+// Code to upload to Bangle.js
+var i = window.innerHeight / 2 - 200;
+var l = window.innerHeight / 2 - 200;
+var h =  window.innerHeight / 2 -50;
+var k = window.innerWidth / 2 - 50;
+var kM = 7;
+var hM = 0;
+var cooldown = 0;
+var acx = 0;
+var posr = [];
+var posr2 = [];
+var init = true;
+var did = false;
+var score = 0;
+var score2 = 0;
+var connect = false;
+var lives = 3;
+var liste = [];
+var counter = 0;
+let button = createButton('RESTART');
+button.position(-1000, -1000);
+button.size(200,100);
+var BANGLE_CODE = `
+var timeout = 0
+var btnp = 0;
+setWatch(function(e) {
+  timeout = 30;
+  console.log("Button pressed");
+  btnp = 1;
+}, BTN, { repeat: true, edge: 'rising' });
+Bangle.on('accel',function(a) {
+if(timeout > 0){timeout--}
+if(timeout == 0){timeout == 30; btnp = 0}
+  var d = [
+    "A",
+    Math.round(a.x*100),
+    Math.round(a.y*100),
+    Math.round(a.z*100),
+    btnp
+    ];
+  Bluetooth.println(d.join(","));
+})
+`;
+var accel = new THREE.Vector3( 0, 0, 1 );
+
+// When we click the connect button...
+var connection;
+document.getElementById("btnConnect").addEventListener("click", function() {
+  // disconnect if connected already
+  if (connection) {
+    connection.close();
+    connection = undefined;
+  }
+  // Connect
+  Puck.connect(function(c) {
+    if (!c) {
+      alert("Couldn't connect!");
+      return;
+    }
+    connection = c;
+    // Handle the data we get back, and call 'onLine'
+    // whenever we get a line
+    var buf = "";
+    connection.on("data", function(d) {
+      buf += d;
+      var l = buf.split("\n");
+      buf = l.pop();
+      l.forEach(onLine);
+    });
+    // First, reset the Bangle
+    connection.write("reset();\n", function() {
+      // Wait for it to reset itself
+      setTimeout(function() {
+        // Now upload our code to it–
+        connection.write("\x03\x10if(1){"+BANGLE_CODE+"}\n",
+          function() { console.log("Ready..."); });
+          connect = true;
+      }, 1500);
+    });
+  });
+});
+
+function died(side){
+did = true;
+hM = 0;
+//if(hM > 0){hM = -7}else{hM = 7}
+if(side == "left"){kM = -7}else{kM = 7}
+h = window.innerHeight / 2;
+k = window.innerWidth / 2;
+if(side == "left"){did = false}
+if(side == "right"){did = false}
+if(side == "right"){score2++;}
+if(side == "left"){score++;}
+if(score == 5 || score2 == 5){did = true; lives = 0;}
+}
+function BallMoveD(){
+
+if(k < 80 && h > posr[0] && h < posr[0] + posr[1] && cooldown == 0){cooldown = 30;if(kM > 0){kM = -7 + random(0,3); if(hM <= 0){hM = -5  + random(0,3);}else{hM = 5  + random(0,3);}}else{kM = 7 + random(0,3); if(hM <= 0){hM = -7 + random(0,3);}else{hM = 7 + random(0-2.5);}}}
+if(k > 2500 && h > posr2[0] && h < posr2[0] + posr2[1] && cooldown == 0){cooldown = 30;if(kM > 0){kM = -7 + random(0,3); if(hM <= 0){hM = -5 + random(0,3);}else{hM = 5 + random(0,3);}}else{kM = 7 + random(0,3); if(hM <= 0){hM = -7 + random(0,3);}else{hM = 7 + random(0-2.5);}}}
+console.log(hM);
+//For making it invinceble
+//if(k > window.innerWidth || k < 0){if(k < 0){kM = -10;}else{kM = 10;}}
+if(k > window.innerWidth || k < 0){if(k < 0){died("right")}else{died("left")/*kM = 7*/}}
+if(h > window.innerHeight || h < 0){if(h < 0){hM = -7 + random(0,3);}else{hM = 7 + random(0,3);}}
+}
+function DrawBall(){
+   h -= hM
+   k -= kM
+   circle(k, h, 50);
+   BallMoveD();
+}
+
+//Data from the accelerometer, update it
+
+function onLine(line) {
+  console.log("RECEIVED:"+line);
+  var d = line.split(",");
+  if (d.length==5 && d[0]=="A") {
+    acx = parseInt(d[1]);
+    btnp = parseInt(d[4]);
+    draw();
+
+  }
+}
+
+function setup() {
+  createCanvas(displayWidth, displayHeight);
+  background(2,displayWidth, displayHeight);
+  textSize(100);
+}
+function draw() {
+counter++;
+if(connect == false){
+if(h < i - - 100){
+  if(i >= 10){i = i - 7;}}else{if(h > i  + 100){if(i <= displayHeight - 200){i = i + 7;}}}
+  background(2);}else{
+  if(acx < -5){
+  if(i >= 10){i = i - 5;}}else{if(acx > 5){if(i <= displayHeight - 200){i = i + 5;}}}
+  background(2);}
+  if(did == false){
+  rect(30,i,35,200);}
+  function keyReleased() {
+  if(keyCode === DOWN_ARROW && keyIsPressed === true){
+  if(l <= displayHeight - 200){l = l + 5;}}else{if(keyCode === UP_ARROW && keyIsPressed === true){if(l >= 10){l = l - 5;}else{}}}
+  if(did == false){
+  rect(2520,l,105,200);}}
+  keyReleased();
+  posr = [i,200,35];
+  posr2 = [l,200,35];
+  textSize(100);
+  fill('white');
+  textAlign(CENTER, TOP);
+  if(did == false){text(score + "   " + score2,1200,100)}
+  if(lives <= 0 && score == 5){did = true; text("Player 1 Won!", 1200,500);}
+   if(lives <= 0 && score2 == 5){did = true; text("Player 2 Won!", 1200,500);}
+  if(lives <= 0){did = true; text("SCORE IS:", 1200,700);}
+  if(lives <= 0){did = true; text(score + "/" + score2, 1550,700);}
+  if(lives <= 0){did = true; button.position(1200, 800);  button.mousePressed(() => {
+  i = window.innerHeight / 2 - 200;
+  h =  window.innerHeight / 2 -50;
+  l = window.innerHeight / 2 - 200;
+  k = window.innerWidth / 2 - 50;
+  button.position(-1000, -1000);
+  kM = 7;
+  hM = 0;
+  cooldown = 0;
+  acx = 0;
+  posr = [];
+  posr2 = [];
+  init = true;
+  did = false;
+  score = 0;
+  score2 = 0;
+  lives = 3;})}
+  if(btnp == 1 && did == true){
+  i = window.innerHeight / 2 - 200;
+  l = window.innerHeight / 2 - 200;
+  h =  window.innerHeight / 2 -50;
+  k = window.innerWidth / 2 - 50;
+  button.position(-1000, -1000);
+  kM = 7;
+  hM = 0;
+  cooldown = 0;
+  acx = 0;
+     posr2 = [];
+  posr = [];
+  init = true;
+  did = false;
+  score = 0;
+  score2 = 0;
+  lives = 3;}
+  if(init == true){
+  init = false;
+  circle(k,h,50);}else{
+  if(did == false){
+  if(cooldown > 0){
+  cooldown--;}
+  DrawBall();}
+  }
+}
+
+
+setup();
+draw();
+</script>
+ </body>
+</html>
